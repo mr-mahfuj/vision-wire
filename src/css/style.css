@@ -1,0 +1,22 @@
+body {
+    background-color: aquamarine
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+}
+
+.screen-link button{
+    background-color: rgb(40, 53, 53);
+    color: white;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 10px;
+    width: 140px;
+}
+.screen-link button:hover{
+    cursor: pointer;
+    background-color: rgb(61, 80, 80);
+}
+

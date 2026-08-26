@@ -36,6 +36,10 @@ async function maybeCompress(bytes, enabled) {
  * @param {string} opts.fecMode 'none' | 'xor' | 'fountain'
  * @param {number} [opts.fecParam] xor group size, or fountain repair-per-K ratio (%)
  * @param {boolean} [opts.compress]
+ * @param {string} [opts.density] 'binary' (default, 1 bit/cell) | 'quad' (2 bits/cell, ~2x
+ *   throughput at the same grid size and camera resolution — see grid.js for the
+ *   reasoning). Needs more contrast headroom than binary, so it's opt-in rather
+ *   than the default.
  * @returns {Promise<Transfer>}
  */
 export async function prepareTransfer(file, opts) {
@@ -44,12 +48,20 @@ export async function prepareTransfer(file, opts) {
   const fileCrc32 = crc32(bytes);
 
   const fecModeCode = { none: FecMode.NONE, xor: FecMode.XOR, fountain: FecMode.FOUNTAIN }[opts.fecMode] ?? FecMode.NONE;
-  const fecParam = opts.fecParam ?? (opts.fecMode === "xor" ? 8 : opts.fecMode === "fountain" ? 30 : 0);
+  // Quad density packs more into each frame, but a misread cell is also
+  // more likely per frame (finer luminance distinctions) — so unless the
+  // caller explicitly set a redundancy level, default it a bit higher for
+  // quad than we would for binary, to keep the outer FEC's safety margin
+  // comparable.
+  const levels = opts.density === "quad" ? 4 : 2;
+  const fecParam =
+    opts.fecParam ??
+    (opts.fecMode === "xor" ? 8 : opts.fecMode === "fountain" ? (levels === 4 ? 40 : 30) : 0);
 
   const gridSize = opts.gridSize === "auto" || !opts.gridSize
-    ? pickGridSize(estimateIdealPayload(bytes.length))
+    ? pickGridSize(estimateIdealPayload(bytes.length), levels)
     : opts.gridSize;
-  const blockSize = maxPayloadBytes(gridSize);
+  const blockSize = maxPayloadBytes(gridSize, levels);
   if (blockSize <= 0) throw new Error("Grid size too small to carry protocol overhead.");
 
   const K = Math.ceil(bytes.length / blockSize) || 1;
@@ -72,6 +84,7 @@ export async function prepareTransfer(file, opts) {
     fecMode: fecModeCode,
     fecParam,
     gridSize,
+    levels,
     fileCrc32,
   });
 
@@ -80,6 +93,7 @@ export async function prepareTransfer(file, opts) {
   return new Transfer({
     sessionId,
     gridSize,
+    levels,
     K,
     blockSize,
     sourceBlocks,
@@ -118,6 +132,12 @@ export class Transfer {
       ? Math.max(1, Math.ceil((this.K * this.fecParam) / 100))
       : 0;
     this._nextRepairId = 0;
+    // First loop gets a generous calibration/meta burst so a person has
+    // real time to align and steady their hand; later loops stay brief.
+    this._firstCalibFrames = 30;
+    this._calibFrames = 8;
+    this._firstMetaFrames = 10;
+    this._metaFrames = 6;
   }
 
   totalBytes() {
@@ -125,13 +145,13 @@ export class Transfer {
   }
 
   /** One full logical loop's frame count (for progress / ETA estimates). */
-  framesPerLoop() {
-    const calib = 8;
-    const meta = 6;
+  framesPerLoop(loop = 1) {
+    const calib = loop === 0 ? this._firstCalibFrames : this._calibFrames;
+    const metaCount = loop === 0 ? this._firstMetaFrames : this._metaFrames;
     let repair = 0;
     if (this.fecModeCode === FecMode.XOR) repair = this._xorGroups;
     if (this.fecModeCode === FecMode.FOUNTAIN) repair = this._repairPerPass;
-    return calib + meta + this.K + repair;
+    return calib + metaCount + this.K + repair;
   }
 
   _xorParityFrame(groupIdx) {
@@ -170,12 +190,20 @@ export class Transfer {
   async *frames(signal) {
     let loop = 0;
     while (!signal?.aborted) {
-      // Calibration burst so a fresh receiver locks on quickly.
-      for (let i = 0; i < 8 && !signal?.aborted; i++) {
+      // The very first loop gets a much longer calibration burst than
+      // later ones: a real person needs a couple of real-world seconds to
+      // read "point your camera here", get their hand steady, and let the
+      // camera's auto-exposure settle — 8 frames at a typical 15fps is
+      // barely half a second, nowhere near enough. Later loops only need
+      // a short burst, for a receiver that joined late or briefly lost lock.
+      const calibCount = loop === 0 ? this._firstCalibFrames : this._calibFrames;
+      const metaCount = loop === 0 ? this._firstMetaFrames : this._metaFrames;
+
+      for (let i = 0; i < calibCount && !signal?.aborted; i++) {
         yield this._grid(this._calibFrame(), "calib", loop);
       }
       // Meta repeated so a receiver that missed the first burst still gets it.
-      for (let i = 0; i < 6 && !signal?.aborted; i++) {
+      for (let i = 0; i < metaCount && !signal?.aborted; i++) {
         const f = buildFrame({
           type: FrameType.META,
           sessionId: this.sessionId,
@@ -218,7 +246,15 @@ export class Transfer {
     });
   }
 
+  // CALIB and META are ALWAYS encoded at binary (levels=2), regardless of
+  // the transfer's chosen data density. The receiver can't know the data
+  // density until it has decoded META — so META itself (and the CALIB
+  // frames that bootstrap a lock before META is even seen) have to use the
+  // one density every receiver already assumes during its blind bootstrap
+  // search. Only DATA/REPAIR/PARITY — the bulk of the transfer — use the
+  // higher-density encoding when quad mode is selected.
   _grid(wireBytes, kind, loop, index = 0) {
-    return { gridSize: this.gridSize, cells: encodeGridCells(this.gridSize, wireBytes), kind, loop, index };
+    const levels = kind === "calib" || kind === "meta" ? 2 : this.levels;
+    return { gridSize: this.gridSize, cells: encodeGridCells(this.gridSize, wireBytes, levels), kind, loop, index, levels };
   }
 }

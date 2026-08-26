@@ -15,17 +15,16 @@
     <div class="navlinks">
       <a href="sender.html">Send</a>
       <a href="receiver.html" style="color: var(--signal)">Receive</a>
-      <a href="./qr-generator/qr-gen.html">QR Generator</a>
     </div>
   </nav>
 
   <div class="container">
     <div class="workspace">
-      <!-- Camera column -->
+      <!-- Camera + primary controls column -->
       <div>
         <div class="panel">
           <div class="panel-title">Camera</div>
-          <div class="viewfinder" id="viewfinderWrap">
+          <div class="viewfinder viewfinder--camera" id="viewfinderWrap">
             <video id="video" autoplay playsinline muted></video>
             <div class="guide-square" id="guideSquare"></div>
             <div class="corner tl"></div>
@@ -39,10 +38,23 @@
             <span id="statusText">Idle</span>
           </div>
           <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+          <!-- Sticky: stays reachable without scrolling past the settings below. -->
+          <div class="action-bar">
+            <div class="mini-stats">
+              <span class="mini-stat"><b id="statBlocks">0 / 0</b> blocks</span>
+              <span class="mini-stat"><b id="statThroughput">—</b></span>
+              <span class="mini-stat"><b id="statElapsed">0s</b></span>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="startBtn" disabled>Start scanning</button>
+              <button class="btn btn-danger" id="stopBtn" disabled>Stop</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Controls column -->
+      <!-- Settings + detail column -->
       <div>
         <div class="panel">
           <div class="panel-title">Camera setup</div>
@@ -74,10 +86,6 @@
             Fill the dashed guide box edge-to-edge with the sender's animated grid, hold steady,
             then press Start scanning.
           </div>
-          <div class="btn-row" style="margin-top: 14px">
-            <button class="btn btn-primary" id="startBtn" disabled>Start scanning</button>
-            <button class="btn btn-danger" id="stopBtn" disabled>Stop</button>
-          </div>
         </div>
 
         <div class="panel">
@@ -85,20 +93,12 @@
           <div id="fileInfo" class="hint">No transfer detected yet.</div>
           <div class="stat-grid" style="margin-top: 12px">
             <div class="stat">
-              <div class="label">Blocks resolved</div>
-              <div class="value signal" id="statBlocks">0 / 0</div>
-            </div>
-            <div class="stat">
               <div class="label">Recovery mode</div>
               <div class="value" id="statFec">—</div>
             </div>
             <div class="stat">
-              <div class="label">Throughput</div>
-              <div class="value" id="statThroughput">—</div>
-            </div>
-            <div class="stat">
-              <div class="label">Elapsed</div>
-              <div class="value" id="statElapsed">0s</div>
+              <div class="label">Frames seen</div>
+              <div class="value" id="statFramesSeen">0</div>
             </div>
           </div>
         </div>

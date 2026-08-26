@@ -292,11 +292,31 @@ a {
 .viewfinder {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-bright);
+}
+
+/* Sender's viewfinder always shows a square grid — fix it 1:1. */
+.viewfinder--square {
+  aspect-ratio: 1 / 1;
+}
+
+/* Receiver's viewfinder gets its aspect-ratio set inline via JS to exactly
+   match the live camera stream (see receiver-ui.js). This is deliberate:
+   the on-screen alignment guide is positioned as a percentage of this box,
+   and the decode worker samples the guide region as a percentage of the
+   *raw camera frame*. If this box doesn't match the camera's true aspect
+   ratio, object-fit:contain silently letterboxes the video — invisibly,
+   since the bars are the same black as the background — and the two
+   percentages stop lining up, which reads as "stuck searching for lock."
+   A sane default before metadata loads, and a height cap so a portrait
+   phone stream doesn't take over the whole page. */
+.viewfinder--camera {
+  aspect-ratio: 3 / 4;
+  max-height: 66vh;
+  margin: 0 auto;
 }
 
 .viewfinder canvas,
@@ -306,6 +326,7 @@ a {
   display: block;
   object-fit: contain;
   background: #000;
+  image-rendering: pixelated;
 }
 
 .viewfinder .corner {
@@ -633,6 +654,37 @@ select:focus {
   50% {
     opacity: 0.4;
   }
+}
+
+/* ---------------------------------------------------------- action bar --- */
+/* The primary Start/Stop controls live directly under the viewfinder they
+   act on, and stick to the bottom of the viewport once the page scrolls —
+   so they're always one tap away regardless of how far down the settings
+   panels run. This is the fix for "buttons need to be closer to the grid /
+   shouldn't require scrolling." */
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 14px -22px -22px;
+  padding: 14px 22px 22px;
+  background: linear-gradient(to bottom, transparent, var(--bg-panel) 22%);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  z-index: 5;
+}
+
+.mini-stats {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.mini-stats .mini-stat b {
+  color: var(--signal);
+  font-size: 13px;
 }
 
 .badge {

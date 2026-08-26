@@ -112,11 +112,12 @@ export function frameBits(payloadBytes) {
  * @param {number} m.fecMode
  * @param {number} m.fecParam
  * @param {number} m.gridSize
+ * @param {number} m.levels          luminance levels per data cell (2 or 4) — see grid.js
  * @param {number} m.fileCrc32       crc32 of the transferSize bytes
  */
 export function buildMetaPayload(m) {
   const nameBytes = new TextEncoder().encode(m.fileName.slice(0, 255));
-  const out = new Uint8Array(1 + nameBytes.length + 8 + 8 + 1 + 2 + 4 + 1 + 1 + 1 + 4);
+  const out = new Uint8Array(1 + nameBytes.length + 8 + 8 + 1 + 2 + 4 + 1 + 1 + 1 + 1 + 4);
   const dv = new DataView(out.buffer);
   let o = 0;
   out[o] = nameBytes.length;
@@ -139,6 +140,8 @@ export function buildMetaPayload(m) {
   out[o] = m.fecParam;
   o += 1;
   out[o] = m.gridSize;
+  o += 1;
+  out[o] = m.levels ?? 2;
   o += 1;
   dv.setUint32(o, m.fileCrc32);
   o += 4;
@@ -168,6 +171,8 @@ export function parseMetaPayload(bytes) {
   o += 1;
   const gridSize = bytes[o];
   o += 1;
+  const levels = bytes[o];
+  o += 1;
   const fileCrc32 = dv.getUint32(o);
   o += 4;
   return {
@@ -180,6 +185,7 @@ export function parseMetaPayload(bytes) {
     fecMode,
     fecParam,
     gridSize,
+    levels,
     fileCrc32,
   };
 }

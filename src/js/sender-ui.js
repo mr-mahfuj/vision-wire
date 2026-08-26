@@ -20,6 +20,7 @@ const fecParamField = $("fecParamField");
 const fecParamSlider = $("fecParamSlider");
 const fecParamVal = $("fecParamVal");
 const fecParamHint = $("fecParamHint");
+const densitySeg = $("densitySeg");
 const compressChk = $("compressChk");
 const canvas = $("canvas");
 const emptyState = $("emptyState");
@@ -36,6 +37,7 @@ const viewfinderWrap = $("viewfinderWrap");
 let selectedFile = null;
 let gridSize = "auto";
 let fecMode = "xor";
+let density = "binary";
 let renderer = null;
 let abortController = null;
 let lastFrameTime = 0;
@@ -96,6 +98,7 @@ segClick(fecSeg, (val) => {
   fecParamVal.textContent = fecParamSlider.value;
 });
 fecParamSlider.addEventListener("input", () => (fecParamVal.textContent = fecParamSlider.value));
+segClick(densitySeg, (val) => (density = val));
 
 fullscreenBtn.addEventListener("click", () => {
   if (!document.fullscreenElement) {
@@ -124,6 +127,7 @@ startBtn.addEventListener("click", async () => {
       fecMode,
       fecParam: Number(fecParamSlider.value),
       compress: compressChk.checked,
+      density,
     });
     bytesTotal = transfer.totalBytes();
 
@@ -139,9 +143,17 @@ startBtn.addEventListener("click", async () => {
       statLoop.textContent = info.loop.toLocaleString();
       statElapsed.textContent = formatDuration(info.elapsed);
 
-      // Approx progress within the current loop, based on data-frame index.
-      const framesPerLoop = transfer.framesPerLoop();
-      const pct = Math.min(100, ((info.count % framesPerLoop) / framesPerLoop) * 100);
+      // Progress within the current pass: driven directly by which data
+      // block we're currently broadcasting (0% at the start of a pass,
+      // 100% once all K blocks have gone out and we move into redundancy
+      // frames). This is more robust than a running-total modulo, since
+      // the very first pass has a longer calibration burst than later
+      // ones — a fixed frames-per-loop divisor would drift at that
+      // boundary.
+      let pct;
+      if (info.kind === "data") pct = ((info.index + 1) / transfer.K) * 100;
+      else if (info.kind === "calib" || info.kind === "meta") pct = 0;
+      else pct = 100; // parity / repair — all data for this pass already sent
       progressFill.style.width = `${pct}%`;
 
       framesThisSecond++;

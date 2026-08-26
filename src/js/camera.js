@@ -28,19 +28,65 @@ export class Camera extends EventEmitter {
 
   async start(deviceId) {
     this.stop();
-    const constraints = {
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        facingMode: deviceId ? undefined : { ideal: "environment" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 60, min: 15 },
+    const constraintAttempts = [
+      {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          facingMode: deviceId ? undefined : { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 60 },
+        },
+        audio: false,
       },
-      audio: false,
-    };
-    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Fallback 1: drop the frameRate hint — some drivers reject it
+      // combined with a high resolution ideal, especially in low light
+      // where the camera wants to auto-drop fps.
+      {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          facingMode: deviceId ? undefined : { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      },
+      // Fallback 2: no hints at all beyond which camera — whatever the
+      // device's default mode is.
+      {
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false,
+      },
+    ];
+
+    let lastError = null;
+    for (const constraints of constraintAttempts) {
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (!this.stream) throw lastError ?? new Error("Could not open camera.");
+
     this.video.srcObject = this.stream;
     await this.video.play();
+    // On some browsers videoWidth/videoHeight aren't populated the instant
+    // play() resolves; wait for loadedmetadata so callers can rely on real
+    // dimensions immediately after start() returns (used to size the
+    // viewfinder to the camera's true aspect ratio — see receiver-ui.js).
+    if (!this.video.videoWidth) {
+      await new Promise((resolve) => {
+        const done = () => {
+          this.video.removeEventListener("loadedmetadata", done);
+          resolve();
+        };
+        this.video.addEventListener("loadedmetadata", done);
+        setTimeout(done, 1500); // don't hang forever on an odd browser
+      });
+    }
     this.track = this.stream.getVideoTracks()[0];
 
     const settings = this.track.getSettings?.() ?? {};

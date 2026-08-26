@@ -11,6 +11,7 @@
 // more than that.
 
 import { EventEmitter } from "./utils.js";
+import { levelToLuminance } from "./grid.js";
 
 export class Renderer extends EventEmitter {
   /**
@@ -64,7 +65,8 @@ export class Renderer extends EventEmitter {
       }
       this._currentCells = value.cells;
       this._currentGridSize = value.gridSize;
-      this._draw(value.cells, value.gridSize);
+      this._currentLevels = value.levels;
+      this._draw(value.cells, value.gridSize, value.levels);
       this._frameCount++;
       this.emit("frame", {
         kind: value.kind,
@@ -90,22 +92,37 @@ export class Renderer extends EventEmitter {
   }
 
   redrawCurrent() {
-    if (this._currentCells) this._draw(this._currentCells, this._currentGridSize);
+    if (this._currentCells) this._draw(this._currentCells, this._currentGridSize, this._currentLevels);
   }
 
-  _draw(cells, gridSize) {
+  _draw(cells, gridSize, levels = 2) {
     const canvas = this.canvas;
+    // Setting canvas.width/height (which resizeCanvas() does on every
+    // window resize AND every fullscreen toggle) resets the ENTIRE 2D
+    // context state back to defaults — including imageSmoothingEnabled.
+    // That silently turns smoothing back on and blurs the nearest-neighbor
+    // upscale below, which is exactly why fullscreen used to blur the grid.
+    // Re-asserting it here, every frame, makes this self-healing regardless
+    // of what else resizes the canvas.
+    this.ctx.imageSmoothingEnabled = false;
     if (this._small.width !== gridSize) {
       this._small.width = gridSize;
       this._small.height = gridSize;
     }
-    // cells is 0/1 with 1=white; expand to RGBA once into a reusable buffer.
+    // cells holds a level index (0..levels-1) per cell — map to an evenly
+    // spaced grayscale byte. levels=2 (the default/binary case) reduces to
+    // plain black/white; levels=4 draws 4 gray steps for the higher-density
+    // "quad" mode (see grid.js).
     if (!this._imgData || this._imgData.width !== gridSize) {
       this._imgData = this._smallCtx.createImageData(gridSize, gridSize);
     }
     const data = this._imgData.data;
+    // Precompute the small lookup table (at most 4 entries) once per call
+    // rather than recomputing the division for every one of thousands of
+    // cells.
+    const lut = this._lutFor(levels);
     for (let i = 0; i < cells.length; i++) {
-      const v = cells[i] ? 255 : 0;
+      const v = lut[cells[i]];
       const o = i * 4;
       data[o] = v;
       data[o + 1] = v;
@@ -121,5 +138,15 @@ export class Renderer extends EventEmitter {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(this._small, 0, 0, gridSize, gridSize, offsetX, offsetY, size, size);
+  }
+
+  _lutFor(levels) {
+    if (!this._lutCache) this._lutCache = new Map();
+    if (!this._lutCache.has(levels)) {
+      const lut = new Uint8Array(levels);
+      for (let i = 0; i < levels; i++) lut[i] = levelToLuminance(i, levels);
+      this._lutCache.set(levels, lut);
+    }
+    return this._lutCache.get(levels);
   }
 }

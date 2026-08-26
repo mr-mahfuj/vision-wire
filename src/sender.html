@@ -1,15 +1,138 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vision wire</title>
-    <link rel="stylesheet" href="./css/style.css">
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision Wire — Send</title>
+  <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-    <div class="sender">
-        Hello this is sender screen
+  <nav class="navbar">
+    <a class="brand" href="./index.html">
+      <span class="brand-mark"></span>
+      Vision Wire
+    </a>
+    <div class="navlinks">
+      <a href="sender.html" style="color: var(--signal)">Send</a>
+      <a href="receiver.html">Receive</a>
+      <a href="./qr-generator/qr-gen.html">QR Generator</a>
     </div>
+  </nav>
+
+  <div class="container">
+    <div class="workspace">
+      <!-- Viewfinder / canvas column -->
+      <div>
+        <div class="panel">
+          <div class="panel-title">Broadcast</div>
+          <div class="viewfinder" id="viewfinderWrap">
+            <canvas id="canvas" width="800" height="800"></canvas>
+            <div class="corner tl"></div>
+            <div class="corner tr"></div>
+            <div class="corner bl"></div>
+            <div class="corner br"></div>
+            <div class="viewfinder-empty" id="emptyState">
+              Choose a file and press Start —<br />the grid will animate here.
+            </div>
+          </div>
+          <div class="status-line">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Idle</span>
+            <span style="flex: 1"></span>
+            <button class="badge" id="fullscreenBtn" style="cursor: pointer; background: none">⤢ Fullscreen</button>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+      </div>
+
+      <!-- Controls column -->
+      <div>
+        <div class="panel">
+          <div class="panel-title">File</div>
+          <div class="field">
+            <label class="file-drop" id="fileDrop">
+              <span id="fileLabel">Click to choose a file…</span>
+              <span>📁</span>
+              <input type="file" id="fileInput" />
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Speed &amp; encoding</div>
+
+          <div class="field">
+            <label>Transfer speed <span class="val" id="fpsVal">15 fps</span></label>
+            <input type="range" id="fpsSlider" min="1" max="60" value="15" step="1" />
+            <div class="hint" id="fpsHint">
+              Pick a receiver first to see its measured camera FPS — matching the two avoids
+              wasted frames.
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Grid size</label>
+            <div class="segmented" id="gridSeg">
+              <button data-val="auto" class="active">Auto</button>
+              <button data-val="48">48</button>
+              <button data-val="64">64</button>
+              <button data-val="96">96</button>
+              <button data-val="128">128</button>
+            </div>
+            <div class="hint">Higher = more bytes/frame, but needs a sharper camera + more light.</div>
+          </div>
+
+          <div class="field">
+            <label>Lost-frame recovery</label>
+            <div class="segmented" id="fecSeg">
+              <button data-val="none">None</button>
+              <button data-val="xor" class="active">XOR parity</button>
+              <button data-val="fountain">Fountain</button>
+            </div>
+          </div>
+
+          <div class="field" id="fecParamField">
+            <label>Parity group size <span class="val" id="fecParamVal">8</span></label>
+            <input type="range" id="fecParamSlider" min="2" max="32" value="8" step="1" />
+            <div class="hint" id="fecParamHint">
+              One parity frame recovers one lost frame per group of this many data frames.
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row"><input type="checkbox" id="compressChk" checked /> Compress before sending (gzip)</label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Transfer</div>
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="label">Frames sent</div>
+              <div class="value signal" id="statFrames">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Loop</div>
+              <div class="value" id="statLoop">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Throughput</div>
+              <div class="value" id="statThroughput">—</div>
+            </div>
+            <div class="stat">
+              <div class="label">Elapsed</div>
+              <div class="value" id="statElapsed">0s</div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top: 18px">
+            <button class="btn btn-primary" id="startBtn" disabled>Start broadcasting</button>
+            <button class="btn btn-danger" id="stopBtn" disabled>Stop</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/sender-ui.js"></script>
 </body>
 </html>

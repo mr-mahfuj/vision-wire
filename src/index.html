@@ -1,26 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vision wire</title>
-    <link rel="stylesheet" href="./css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vision Wire — screen-to-camera data transfer</title>
+  <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-    <nav class="navbar">
-        This is a navbar
-    </nav>
-    <div class="container">
-        <div class="screen-link">
-            <a href="sender.html"><button type="button" >Send</button></a>
-        </div>
-        <div class="screen-link">
-            <a href="receiver.html"><button type="button" >Receive</button></a>
-        </div>
-        <div class="qr-generator-page screen-link">
-            <a href="./qr-generator/qr-gen.html"><button type="button" >Qr Generator</button></a>
-        </div>
-
+  <nav class="navbar">
+    <a class="brand" href="./index.html">
+      <span class="brand-mark"></span>
+      Vision Wire
+    </a>
+    <div class="navlinks">
+      <a href="sender.html">Send</a>
+      <a href="receiver.html">Receive</a>
+      <a href="./qr-generator/qr-gen.html">QR Generator</a>
     </div>
+  </nav>
+
+  <div class="page">
+    <section class="hero">
+      <h1>Move files through <span class="accent">light</span>, not wires.</h1>
+      <p>
+        Vision Wire streams a file as a dense, animated binary grid on one screen and
+        reconstructs it from a camera pointed at that screen on another device — no network,
+        no cable, no pairing. A custom grid format (denser than QR), adjustable transfer speed,
+        automatic camera-FPS matching, and a rateless fountain code for lost-frame recovery make
+        it faster and more resilient than swiping through a stack of QR codes.
+      </p>
+    </section>
+
+    <div class="mode-grid">
+      <a class="mode-card screen-link" href="sender.html">
+        <div class="icon">▲</div>
+        <h3>Send a file</h3>
+        <p>Pick a file, choose your speed and recovery mode, and start broadcasting it as light.</p>
+        <div class="cta">Open sender →</div>
+      </a>
+      <a class="mode-card screen-link" href="receiver.html">
+        <div class="icon">◎</div>
+        <h3>Receive a file</h3>
+        <p>Point a camera at the sender's screen. Vision Wire locks on, decodes, and saves the file.</p>
+        <div class="cta">Open receiver →</div>
+      </a>
+      <a class="mode-card screen-link" href="./qr-generator/qr-gen.html">
+        <div class="icon">▦</div>
+        <h3>QR generator</h3>
+        <p>A standalone utility for one-off static QR codes, kept alongside the main transfer tools.</p>
+        <div class="cta">Open tool →</div>
+      </a>
+    </div>
+
+    <div class="feature-list">
+      <div class="feature">
+        <h4>Denser than QR</h4>
+        <p>
+          A lightweight 22-byte header + CRC32 replaces QR's finder patterns and baked-in
+          Reed–Solomon overhead, so a custom grid carries meaningfully more payload per cell —
+          and the grid size auto-scales (48–128 px) to the file and camera quality.
+        </p>
+      </div>
+      <div class="feature">
+        <h4>Camera-aware speed</h4>
+        <p>
+          The receiver measures the camera's <em>actually delivered</em> frame rate (not just
+          what the driver claims) and the sender's speed slider is matched against it, so you're
+          never paying for frames the camera can't keep up with.
+        </p>
+      </div>
+      <div class="feature">
+        <h4>Three recovery modes</h4>
+        <p>
+          None (max speed, ideal conditions), XOR block-parity (cheap single-loss recovery), or a
+          rateless LT fountain code that reconstructs the whole file from any sufficiently large
+          set of symbols — immune to which frames were actually missed.
+        </p>
+      </div>
+      <div class="feature">
+        <h4>Off-thread decoding</h4>
+        <p>
+          All per-frame grid sampling and error correction runs in a Web Worker, so the camera
+          capture loop and UI stay smooth even at high grid resolution and frame rate.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-footer">vision-wire · optical file transfer, entirely client-side</footer>
 </body>
 </html>
